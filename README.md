@@ -1,14 +1,10 @@
 # Chat to Markdown
 
-> 把大模型对话里的 Markdown 变成排版精美的文档：实时预览、一键导出。
+你是否有这样的苦恼：DeepSeek / 豆包等聊天工具生成的结果，在聊天界面里完美无瑕，但是一旦拷贝到word中格式全乱？公式混乱且不可编辑，图像丢失，示意图（Mermaid/SVG）变成了源代码？如果你遇到这些问题，可以试试这个一键粘贴，一键导出word的工具：Chat to Markdown。
 
-<p align="center">
-  <a href="http://chat2md.site">🌐 在线体验</a> &nbsp;·&nbsp;
-  <a href="https://github.com/agi-hub/chat2md">⭐ GitHub 仓库</a> &nbsp;·&nbsp;
-  <a href="http://chat2md.site">http://chat2md.site</a>
-</p>
+由于大模型的输出是Markdown排版的，因此直接粘贴到word并不理想，这个软件做的，就是把大模型对话里的 Markdown 变成排版精美的文档：实时预览、一键导出。
 
-一个纯前端为主、可打包为桌面应用的 Markdown 预览及转换工具。专为「与大模型聊天后导出文档」的场景设计——把 AI 输出的 Markdown（含 Mermaid 流程图、SVG 示意图、数学公式）渲染成所见即所得的预览，并导出为 PDF / Word / HTML 等格式。
+Chat to Markdown专为「与大模型聊天后导出文档」的场景设计——把 AI 输出的 Markdown（含 Mermaid 流程图、SVG 示意图、数学公式）渲染成所见即所得的预览，并导出为 PDF / Word / HTML 等格式。
 
 ![demo](chat2md.png)
 
