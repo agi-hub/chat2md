@@ -251,7 +251,6 @@ function App() {
   const [html, setHtml] = useState('');
   const [exporting, setExporting] = useState('');
   const [editorVisible, setEditorVisible] = useState(true);
-  const [showTip, setShowTip] = useState(true);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [showPasteModal, setShowPasteModal] = useState(false);
   const exportMenuRef = useRef(null);
@@ -687,16 +686,6 @@ const isTauri = () => typeof window !== 'undefined' && window.__TAURI_INTERNALS_
         </div>
       </header>
 
-      {/* 提示横幅 */}
-      {showTip && (
-        <div className="tip-banner">
-          <span className="tip-icon">💡</span>
-          <span className="tip-text">
-            <strong>提示：</strong>与 AI 聊天时，可让大模型用 <code>Mermaid</code> 输出流程图，用 <code>SVG 源码</code> 绘制示意图。
-          </span>
-          <button className="tip-close" onClick={() => setShowTip(false)} title="关闭提示">✕</button>
-        </div>
-      )}
 
       {/* 主内容区 */}
       <main
@@ -760,6 +749,10 @@ const isTauri = () => typeof window !== 'undefined' && window.__TAURI_INTERNALS_
             <img src="/demo.gif" alt="导入演示" className="modal-demo-gif" />
             <h3>如何导入 Markdown</h3>
             <p className="modal-hint">请点击 Deepseek/豆包的聊天下方的「复制」按钮，之后在本处或 Markdown 编辑框内粘贴。</p>
+            <div className="modal-tip">
+              <span className="modal-tip-icon">💡</span>
+              <span><strong>提示：</strong>与 AI 聊天时，可让大模型用 <code>Mermaid</code> 输出流程图，用 <code>SVG 源码</code> 绘制示意图。</span>
+            </div>
             <textarea
               ref={pasteTextareaRef}
               className="modal-textarea"
