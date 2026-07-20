@@ -1,0 +1,23 @@
+[package]
+name = "chat-to-markdown"
+version = "0.1.0"
+description = "Markdown 预览及转换工具"
+authors = ["Chat to Markdown"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+tempfile = "3"
+uuid = { version = "1", features = ["v4"] }
+regex-lite = "0.1"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
