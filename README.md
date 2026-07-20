@@ -2,6 +2,12 @@
 
 > 把大模型对话里的 Markdown 变成排版精美的文档：实时预览、一键导出。
 
+<p align="center">
+  <a href="http://chat2md.site">🌐 在线体验</a> &nbsp;·&nbsp;
+  <a href="https://github.com/agi-hub/chat2md">⭐ GitHub 仓库</a> &nbsp;·&nbsp;
+  <a href="http://chat2md.site">http://chat2md.site</a>
+</p>
+
 一个纯前端为主、可打包为桌面应用的 Markdown 预览及转换工具。专为「与大模型聊天后导出文档」的场景设计——把 AI 输出的 Markdown（含 Mermaid 流程图、SVG 示意图、数学公式）渲染成所见即所得的预览，并导出为 PDF / Word / HTML 等格式。
 
 ![demo](public/demo.gif)
