@@ -92,8 +92,14 @@ app.post('/api/export-word', async (req, res) => {
         const pngPath = join(workspace, `svg-${i}.png`);
         try {
           saveDataUrl(item.png, pngPath);
-          const svgRegex = /<svg[\s\S]*?<\/svg>/;
-          processedMd = processedMd.replace(svgRegex, `![](svg-${i}.png)`);
+          // 优先匹配 ``` 包裹的整块，再回退到裸 <svg>
+          const svgBlockRegex = /```(?:svg)?\s*<svg[\s\S]*?<\/svg>\s*```/;
+          const svgRawRegex = /<svg[\s\S]*?<\/svg>/;
+          if (svgBlockRegex.test(processedMd)) {
+            processedMd = processedMd.replace(svgBlockRegex, `![](svg-${i}.png)`);
+          } else {
+            processedMd = processedMd.replace(svgRawRegex, `![](svg-${i}.png)`);
+          }
         } catch (e) {
           console.error(`svg-${i} 保存失败:`, e.message);
         }

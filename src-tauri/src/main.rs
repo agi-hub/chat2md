@@ -3,7 +3,6 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Write;
 use std::process::Command;
 use tempfile::TempDir;
 use uuid::Uuid;
@@ -92,10 +91,19 @@ fn export_word(args: ExportWordArgs) -> ExportResult {
                 eprintln!("svg-{} 保存失败: {}", i, e);
                 continue;
             }
-            // 替换内联 SVG
-            if let Ok(re) = regex_lite::Regex::new(r"<svg[\s\S]*?</svg>") {
-                let replacement = format!("![]({})", filename);
-                processed_md = re.replace(&processed_md, replacement).to_string();
+            // 替换内联 SVG：优先匹配 ``` 包裹的整块，再回退到裸 <svg>
+            let patterns = [
+                r"(?s)```(?:svg)?\s*<svg[\s\S]*?</svg>\s*```",
+                r"<svg[\s\S]*?</svg>",
+            ];
+            let replacement = format!("![]({})", filename);
+            for pat in patterns {
+                if let Ok(re) = regex_lite::Regex::new(pat) {
+                    if re.is_match(&processed_md) {
+                        processed_md = re.replace(&processed_md, replacement.as_str()).to_string();
+                        break;
+                    }
+                }
             }
         }
     }

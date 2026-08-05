@@ -41,10 +41,15 @@ const MERMAID_THEME = {
 // 配置 marked
 const renderer = new marked.Renderer();
 
-// 代码块渲染 - 支持 mermaid 和语法高亮
+// 代码块渲染 - 支持 mermaid、内联 SVG 和语法高亮
 renderer.code = function ({ text, lang }) {
   if (lang === 'mermaid') {
     return `<div class="mermaid-block" data-mermaid="${encodeURIComponent(text)}"></div>`;
+  }
+  // 检测被 ``` 包裹的内联 SVG（lang 为 svg 或内容本身是 <svg>...</svg>）
+  const trimmed = text.trim();
+  if (lang === 'svg' || (trimmed.startsWith('<svg') && trimmed.endsWith('</svg>'))) {
+    return `<div class="md-inline-svg">${trimmed}</div>`;
   }
   const validLang = hljs.getLanguage(lang) ? lang : 'plaintext';
   const highlighted = hljs.highlight(text, { language: validLang }).value;
