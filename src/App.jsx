@@ -246,6 +246,21 @@ LIMIT 10;
 *本文档用于测试 Chat to Markdown 的各项渲染能力。*
 `;
 
+// 从 markdown 内容生成导出文件名：优先用首个标题，否则取前 20 字
+function getExportFilename(markdown) {
+  // 提取首个一级标题
+  const m = markdown.match(/^\s*#\s+(.+?)\s*$/m);
+  let base = m ? m[1] : markdown.trim().slice(0, 20);
+  // 去除 markdown 行内格式标记
+  base = base
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\[(.+?)\]\([^)]*\)/g, '$1');
+  // 去除文件名非法字符及首尾空白/点
+  base = base.replace(/[\\/:*?"<>|\n\r\t]/g, '').trim().replace(/^\.+|\.+$/g, '');
+  return base || '导出文档';
+}
 function App() {
   const [markdown, setMarkdown] = useState(DEMO_MD);
   const [html, setHtml] = useState('');
@@ -351,12 +366,12 @@ function App() {
     setExportMenuOpen(false);
     setExporting('pdf');
     try {
-      await exportToPDF(previewRef.current, 'markdown-export.pdf');
+      await exportToPDF(previewRef.current, `${getExportFilename(markdown)}.pdf`);
     } catch (err) {
       alert('PDF 导出失败: ' + err.message);
     }
     setExporting('');
-  }, []);
+  }, [markdown]);
 
   // 从预览区提取渲染后的 mermaid 和内联 SVG，转为 PNG
   const extractImages = useCallback(async () => {
@@ -487,7 +502,7 @@ const isTauri = () => typeof window !== 'undefined' && window.__TAURI_INTERNALS_
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = 'markdown-export.docx';
+          a.download = `${getExportFilename(markdown)}.docx`;
           a.click();
           URL.revokeObjectURL(url);
         } else {
@@ -505,7 +520,7 @@ const isTauri = () => typeof window !== 'undefined' && window.__TAURI_INTERNALS_
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = 'markdown-export.docx';
+          a.download = `${getExportFilename(markdown)}.docx`;
           a.click();
           URL.revokeObjectURL(url);
         } else {
@@ -526,18 +541,18 @@ const isTauri = () => typeof window !== 'undefined' && window.__TAURI_INTERNALS_
   // 导出 Markdown
   const handleExportMarkdown = useCallback(() => {
     setExportMenuOpen(false);
-    exportToMarkdown(markdown, 'markdown-export.md');
+    exportToMarkdown(markdown, `${getExportFilename(markdown)}.md`);
   }, [markdown]);
 
   // 导出 HTML — 用预览区 DOM（含已渲染的 mermaid SVG）
   const handleExportHTML = useCallback(() => {
     setExportMenuOpen(false);
     if (previewRef.current) {
-      exportToHTML(previewRef.current.innerHTML, 'markdown-export.html');
+      exportToHTML(previewRef.current.innerHTML, `${getExportFilename(markdown)}.html`);
     } else {
-      exportToHTML(html, 'markdown-export.html');
+      exportToHTML(html, `${getExportFilename(markdown)}.html`);
     }
-  }, [html]);
+  }, [html, markdown]);
 
   // 导出所有图片（打包为 zip）
   const handleExportImages = useCallback(async () => {
@@ -595,13 +610,13 @@ const isTauri = () => typeof window !== 'undefined' && window.__TAURI_INTERNALS_
         alert('未找到可导出的图片');
       } else {
         const zipBlob = await zip.generateAsync({ type: 'blob' });
-        saveAs(zipBlob, 'images-export.zip');
+        saveAs(zipBlob, `${getExportFilename(markdown)}-图片.zip`);
       }
     } catch (err) {
       alert('图片导出失败: ' + err.message);
     }
     setExporting('');
-  }, []);
+  }, [markdown]);
 
   return (
     <div className="app">
