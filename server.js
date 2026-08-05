@@ -142,7 +142,7 @@ app.post('/api/export-word', async (req, res) => {
     const args = [
       tmpMd,
       '-o', tmpDocx,
-      '--from', 'markdown',
+      '--from', 'markdown+hard_line_breaks',
       '--to', 'docx',
       `--resource-path=${workspace}`,
     ];

@@ -132,7 +132,7 @@ fn export_word(args: ExportWordArgs) -> ExportResult {
         .arg("-o")
         .arg(&output_path)
         .arg("--from")
-        .arg("markdown")
+        .arg("markdown+hard_line_breaks")
         .arg("--to")
         .arg("docx")
         .arg(format!("--resource-path={}", workspace.display()));
