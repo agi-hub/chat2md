@@ -427,6 +427,7 @@ body {
   padding: 16px;
   background: #1e1e2e;
   color: #cdd6f4;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', monospace;
   font-size: 13px;
   line-height: 1.6;
   border-radius: var(--radius);

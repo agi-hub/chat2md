@@ -77,7 +77,7 @@ fn export_word(args: ExportWordArgs) -> ExportResult {
             // 替换对应的 mermaid 代码块
             let regex_pattern = format!(r"```mermaid[\s\S]*?```");
             if let Ok(re) = regex_lite::Regex::new(&regex_pattern) {
-                let replacement = format!("![Mermaid 图表 {}]({})", i + 1, filename);
+                let replacement = format!("![]({})", filename);
                 processed_md = re.replace(&processed_md, replacement).to_string();
             }
         }
@@ -94,7 +94,7 @@ fn export_word(args: ExportWordArgs) -> ExportResult {
             }
             // 替换内联 SVG
             if let Ok(re) = regex_lite::Regex::new(r"<svg[\s\S]*?</svg>") {
-                let replacement = format!("![SVG 图像 {}]({})", i + 1, filename);
+                let replacement = format!("![]({})", filename);
                 processed_md = re.replace(&processed_md, replacement).to_string();
             }
         }

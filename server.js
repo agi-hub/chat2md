@@ -78,7 +78,7 @@ app.post('/api/export-word', async (req, res) => {
             '```mermaid[\\s\\S]*?```',
             'm'
           );
-          processedMd = processedMd.replace(mermaidRegex, `![Mermaid 图表 ${i + 1}](mermaid-${i}.png)`);
+          processedMd = processedMd.replace(mermaidRegex, `![](mermaid-${i}.png)`);
         } catch (e) {
           console.error(`mermaid-${i} 保存失败:`, e.message);
         }
@@ -93,7 +93,7 @@ app.post('/api/export-word', async (req, res) => {
         try {
           saveDataUrl(item.png, pngPath);
           const svgRegex = /<svg[\s\S]*?<\/svg>/;
-          processedMd = processedMd.replace(svgRegex, `![SVG 图像 ${i + 1}](svg-${i}.png)`);
+          processedMd = processedMd.replace(svgRegex, `![](svg-${i}.png)`);
         } catch (e) {
           console.error(`svg-${i} 保存失败:`, e.message);
         }
