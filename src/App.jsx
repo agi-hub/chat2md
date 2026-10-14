@@ -261,6 +261,89 @@ function getExportFilename(markdown) {
   base = base.replace(/[\\/:*?"<>|\n\r\t]/g, '').trim().replace(/^\.+|\.+$/g, '');
   return base || '导出文档';
 }
+
+// ===== 素材导入：多文件 / zip / 文件夹 =====
+
+// 展开输入：zip 解压为虚拟文件，普通文件取相对路径
+async function collectFiles(fileList) {
+  const out = [];
+  for (const f of fileList) {
+    if (f.name.toLowerCase().endsWith('.zip')) {
+      const zip = await JSZip.loadAsync(f);
+      const entries = [];
+      zip.forEach((path, entry) => {
+        if (entry.dir) return;
+        // 跳过系统元数据
+        if (/(^|\/)(__MACOSX|\.DS_Store)/i.test(path)) return;
+        entries.push({ path, entry });
+      });
+      for (const { path, entry } of entries) {
+        out.push({ path, blob: await entry.async('blob') });
+      }
+    } else {
+      out.push({ path: f.webkitRelativePath || f.name, blob: f });
+    }
+  }
+  return out;
+}
+
+// 选取主文档：md 优先（按路径排序取第一个），无 md 时退回 txt
+function pickMainDoc(files) {
+  const mds = files.filter((f) => /\.(md|markdown)$/i.test(f.path));
+  const pool = mds.length > 0 ? mds : files.filter((f) => /\.txt$/i.test(f.path));
+  if (pool.length === 0) return null;
+  pool.sort((a, b) => a.path.localeCompare(b.path));
+  return pool[0];
+}
+
+// 上传素材到服务端（JSON base64），返回 URL 前缀；失败返回 null
+async function uploadAssets(assets) {
+  if (!assets.length) return null;
+  const files = await Promise.all(assets.map(async (a) => {
+    const bytes = new Uint8Array(await a.blob.arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    return { path: a.path, data: btoa(bin) };
+  }));
+  const resp = await fetch('/api/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files }),
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const j = await resp.json();
+  return j.base;
+}
+
+// 构建素材路径 → URL 映射；base 为空时退化为 blob URL（仅本地预览）
+function buildAssetMap(base, assets) {
+  const map = {};
+  for (const a of assets) {
+    const url = base
+      ? `${base}/${a.path.split('/').map(encodeURIComponent).join('/')}`
+      : URL.createObjectURL(a.blob);
+    map[a.path] = url;
+    const basename = a.path.split('/').pop();
+    if (!(basename in map)) map[basename] = url;
+  }
+  return map;
+}
+
+// 重写 md 中的相对路径图片引用为素材 URL
+function rewriteImageRefs(md, mainPath, map) {
+  if (!map) return md;
+  const mainDir = mainPath.includes('/') ? mainPath.slice(0, mainPath.lastIndexOf('/') + 1) : '';
+  return md.replace(/(!\[[^\]]*\]\()([^)\s]+)(?:\s+("[^"]*"))?\)/g, (m, pre, ref, title) => {
+    if (/^(https?:|data:|blob:|\/uploads\/|#)/i.test(ref)) return m;
+    let key;
+    try { key = decodeURIComponent(ref); } catch { key = ref; }
+    key = key.replace(/^\.\//, '');
+    const url = map[key] || map[mainDir + key] || map[key.split('/').pop()];
+    return url ? `${pre}${url}${title ? ' ' + title : ''})` : m;
+  });
+}
 function App() {
   const [markdown, setMarkdown] = useState(DEMO_MD);
   const [html, setHtml] = useState('');
@@ -275,6 +358,7 @@ function App() {
   const mainRef = useRef(null);
   const previewRef = useRef(null);
   const fileInputRef = useRef(null);
+  const dirInputRef = useRef(null);
 
   // 拖拽分隔条
   const handleMouseDown = useCallback((e) => {
@@ -317,16 +401,42 @@ function App() {
     fileInputRef.current?.click();
   }, []);
 
-  const handleFileChange = useCallback((e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setMarkdown(ev.target.result);
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+  // 导入入口：多文件 / zip / 文件夹统一处理
+  const handleImport = useCallback(async (fileList) => {
+    if (!fileList || fileList.length === 0) return;
+    try {
+      const files = await collectFiles(fileList);
+      if (files.length === 0) return;
+      const main = pickMainDoc(files);
+      if (!main) {
+        alert('未找到 Markdown 文件（支持 .md / .markdown / .txt）');
+        return;
+      }
+      const text = await main.blob.text();
+      // 其余全部作为背景素材（含其他 md、图片等）
+      const assets = files.filter((f) => f !== main);
+      let base = null;
+      try {
+        base = await uploadAssets(assets);
+      } catch {
+        base = null; // 服务不可用时退化为 blob URL 本地预览
+      }
+      const map = buildAssetMap(base, assets);
+      setMarkdown(rewriteImageRefs(text, main.path, map));
+    } catch (err) {
+      alert('导入失败: ' + err.message);
+    }
   }, []);
+
+  // 上传文件夹入口
+  const handleDirOpen = useCallback(() => {
+    dirInputRef.current?.click();
+  }, []);
+
+  const handleFileInput = useCallback((e) => {
+    handleImport(e.target.files);
+    e.target.value = '';
+  }, [handleImport]);
 
   // 粘贴处理 - 显示粘贴弹窗
   const handlePaste = useCallback(() => {
@@ -587,8 +697,8 @@ const isTauri = () => typeof window !== 'undefined' && window.__TAURI_INTERNALS_
         count++;
       }
 
-      // 3. 网络图片
-      const imgs = previewRef.current.querySelectorAll('img[src^="http"]');
+      // 3. 网络图片 + 上传素材图片（/uploads/ 同源可 fetch）
+      const imgs = previewRef.current.querySelectorAll('img[src^="http"], img[src^="/uploads/"]');
       let imgIdx = 0;
       await Promise.all(Array.from(imgs).map(async (img) => {
         const src = img.getAttribute('src');
@@ -655,8 +765,11 @@ const isTauri = () => typeof window !== 'undefined' && window.__TAURI_INTERNALS_
               ▶ 显示编辑器
             </button>
           )}
-          <button className="btn btn-open" onClick={handleFileOpen}>
+          <button className="btn btn-open" onClick={handleFileOpen} title="支持多选 Markdown / 图片 / zip">
             📂 打开文件
+          </button>
+          <button className="btn btn-open" onClick={handleDirOpen} title="上传整个文件夹（含子目录）">
+            🗂️ 上传文件夹
           </button>
           <button className="btn btn-paste" onClick={handlePaste}>
             📥 如何导入
@@ -694,9 +807,19 @@ const isTauri = () => typeof window !== 'undefined' && window.__TAURI_INTERNALS_
           <input
             ref={fileInputRef}
             type="file"
-            accept=".md,.markdown,.txt"
+            multiple
+            accept=".md,.markdown,.txt,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp"
             style={{ display: 'none' }}
-            onChange={handleFileChange}
+            onChange={handleFileInput}
+          />
+          <input
+            ref={dirInputRef}
+            type="file"
+            webkitdirectory=""
+            directory=""
+            multiple
+            style={{ display: 'none' }}
+            onChange={handleFileInput}
           />
         </div>
       </header>

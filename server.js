@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { execFile } from 'child_process';
-import { writeFileSync, unlinkSync, readFileSync, statSync, mkdirSync } from 'fs';
+import { writeFileSync, unlinkSync, readFileSync, statSync, mkdirSync, readdirSync, rmSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
@@ -10,6 +10,7 @@ import sharp from 'sharp';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
+const uploadsDir = join(__dirname, 'uploads');
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -33,6 +34,57 @@ async function downloadImage(url, outputPath) {
     writeFileSync(outputPath, buffer);
   }
 }
+
+// ===== 素材上传：多文件/zip/文件夹的素材统一存储，保留 24 小时 =====
+
+// 清理超过 24 小时的上传目录（启动时 + 每小时执行）
+function cleanupUploads() {
+  const cutoff = Date.now() - 24 * 3600 * 1000;
+  let removed = 0;
+  try {
+    for (const name of readdirSync(uploadsDir)) {
+      const p = join(uploadsDir, name);
+      try {
+        if (statSync(p).mtimeMs < cutoff) {
+          rmSync(p, { recursive: true, force: true });
+          removed++;
+        }
+      } catch {}
+    }
+  } catch {}
+  if (removed > 0) console.log(`已清理 ${removed} 个过期上传目录`);
+}
+
+// 接收素材文件（JSON base64），按上传时间戳目录存储，不做用户隔离
+app.post('/api/upload', (req, res) => {
+  const { files } = req.body || {};
+  if (!Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ error: '没有可上传的文件' });
+  }
+  const ts = Date.now();
+  const dir = join(uploadsDir, String(ts));
+  const stored = [];
+  try {
+    for (const f of files) {
+      // 防路径穿越：去掉 .. 与绝对路径前缀
+      const safePath = String(f.path || '')
+        .replace(/\.\./g, '')
+        .replace(/^\/+/, '');
+      if (!safePath) continue;
+      const target = join(dir, safePath);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, Buffer.from(f.data, 'base64'));
+      stored.push(safePath);
+    }
+    res.json({ base: `/uploads/${ts}`, files: stored });
+  } catch (e) {
+    console.error('素材上传失败:', e.message);
+    res.status(500).json({ error: '素材上传失败: ' + e.message });
+  }
+});
+
+// 素材静态服务（须在 catch-all 之前）
+app.use('/uploads', express.static(uploadsDir));
 
 // Word 导出 - 使用 pandoc + reference 模板 + 图片处理
 app.post('/api/export-word', async (req, res) => {
@@ -135,6 +187,32 @@ app.post('/api/export-word', async (req, res) => {
       }
     }
 
+    // 3.5 处理 /uploads/ 本地素材图片：复制到 workspace（SVG 转 PNG）
+    const localImgRegex = /!\[([^\]]*)\]\((\/uploads\/[^)\s]+)\)/g;
+    let localIdx = 0;
+    const localImgs = [];
+    processedMd = processedMd.replace(localImgRegex, (match, alt, url) => {
+      const rel = decodeURIComponent(url.replace(/^\/uploads\//, ''));
+      const isSvg = rel.match(/\.svg$/i);
+      const ext = isSvg ? 'png' : (rel.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i)?.[1]?.toLowerCase() || 'png');
+      const filename = `local-${localIdx++}.${ext}`;
+      localImgs.push({ src: join(uploadsDir, rel), filename, isSvg: !!isSvg });
+      return `![${alt}](${filename})`;
+    });
+
+    for (const li of localImgs) {
+      try {
+        if (li.isSvg) {
+          const pngBuf = await sharp(li.src, { density: 200 }).png().toBuffer();
+          writeFileSync(join(workspace, li.filename), pngBuf);
+        } else {
+          copyFileSync(li.src, join(workspace, li.filename));
+        }
+      } catch (e) {
+        console.error(`本地素材复制失败 ${li.src}:`, e.message);
+      }
+    }
+
     // 4. 写入处理后的 markdown
     writeFileSync(tmpMd, processedMd, 'utf-8');
 
@@ -180,6 +258,10 @@ app.use(express.static(distPath));
 app.get('/{*splat}', (req, res) => {
   res.sendFile(join(distPath, 'index.html'));
 });
+
+// 启动时清理过期素材，之后每小时滚动清理（素材保留 24 小时）
+cleanupUploads();
+setInterval(cleanupUploads, 60 * 60 * 1000).unref();
 
 app.listen(PORT, () => {
   console.log(`Chat to Markdown 服务已启动: http://localhost:${PORT}`);
